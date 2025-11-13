@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { z } from 'zod';
 
 import { formatZodError } from '@shared/utils/error-formatter';
+import { resUtil } from '@shared/utils/response.util';
 
 export const validate = (
   schema: z.ZodType,
@@ -10,10 +11,7 @@ export const validate = (
   return (req, res, next) => {
     const result = schema.safeParse(req[location]);
     if (!result.success) {
-      res.status(400).json({
-        status: 'fail',
-        data: { errors: formatZodError(result.error) },
-      });
+      resUtil.fail(res, { errors: formatZodError(result.error) });
       return;
     }
 
