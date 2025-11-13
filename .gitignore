@@ -1,3 +1,10 @@
+# Local data
+mongo_data
+redis_data
+
+# Editor / misc
+.vscode
+
 # Logs
 logs
 *.log
