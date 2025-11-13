@@ -1,5 +1,6 @@
-import { ResponseStatusEnum } from '@shared/enums/response-status.enum';
 import { Response } from 'express';
+
+import { ResponseStatusEnum } from '@shared/enums/response-status.enum';
 
 export const resUtil = {
   success: (res: Response, data: any, code = 200) =>
