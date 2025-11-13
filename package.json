@@ -6,6 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "db:bson": "node -r tsconfig-paths/register dist/database/json-schemas.js",
+    "db:healthcheck": "node -r tsconfig-paths/register dist/database/healthcheck.js",
     "predev": "docker compose -f docker-compose.dev.yaml up -d",
     "dev": "cross-env NODE_ENV=development ts-node-dev --respawn -r tsconfig-paths/register src/main.ts",
     "postdev": "docker compose -f docker-compose.dev.yaml down --remove-orphans",
