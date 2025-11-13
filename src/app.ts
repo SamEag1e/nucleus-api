@@ -6,13 +6,13 @@ import helmet from 'helmet';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 
+import { errorHandler } from '@shared/exceptions-handlers/error-handler';
+import logger from '@shared/logger/logger';
 import router from './index.routes';
 import { generateSwaggerDocument } from './swagger/swagger';
-// import { errorHandler } from './shared/exception-handlers/error-handler';
 
 export const createApp = (options: { isDev: boolean }) => {
   const app = express();
-  //   const logger = getLogger();
 
   // Middlewares
   app.use(helmet());
@@ -24,7 +24,7 @@ export const createApp = (options: { isDev: boolean }) => {
     morgan(':method :url :status :res[content-length] - :response-time ms', {
       stream: {
         write: (message) => {
-          //   logger.info(message.trim());
+          logger.info(message.trim());
         },
       },
       skip: (req, res) => {
@@ -46,8 +46,8 @@ export const createApp = (options: { isDev: boolean }) => {
   // API routes
   app.use('/api/v2', router);
 
-  //   // Global error handler
-  //   app.use(errorHandler);
+  // Global error handler
+  app.use(errorHandler);
 
   return app;
 };

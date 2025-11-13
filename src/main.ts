@@ -1,25 +1,25 @@
 import { createApp } from './app'; // This must be at top
 
+import logger from '@shared/logger/logger';
+import { getCacheService } from '@shared/services/cache.service';
+import { getConfigService } from '@shared/services/config.service';
+
 const start = async () => {
   const cacheService = getCacheService();
   const configService = getConfigService();
-  const logger = getLogger();
   const mongoService = getMongoService();
 
   try {
-    cacheService.connect(
-      configService.redisHost,
-      configService.redisPort,
-      configService.redisPassword
-    );
-    await mongoService.connect(configService.mongoUri);
-
-    // const fileLogTransport = createFileTransport();
-    // logger.addTransport(fileLogTransport);
+    cacheService.connect({
+      host: configService.REDIS_HOST,
+      port: configService.REDIS_PORT,
+      pw: configService.REDIS_PASSWORD,
+    });
+    await mongoService.connect(configService.MONGO_URI);
 
     const app = createApp({ isDev: configService.isDev });
 
-    const PORT = configService.port;
+    const PORT = configService.APP_PORT;
     app.listen(PORT, () => {
       logger.info(`Server running at http://localhost:${PORT}`);
     });

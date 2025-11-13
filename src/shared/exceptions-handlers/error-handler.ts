@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 
 import { resUtil } from '@shared/utils/response.util';
 import { AppError } from '@shared/exceptions/app-error';
+import logger from '@shared/logger/logger';
 
 export const errorHandler = (
   err: any,
@@ -23,6 +24,6 @@ export const errorHandler = (
     return;
   }
 
-  //   getLogger().error(err.message ?? 'Unexpected Error', err);
+  logger.error(err.message ?? 'Unexpected Error', err);
   resUtil.error(res, err);
 };
