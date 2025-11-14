@@ -1,5 +1,11 @@
 import { AppError } from './app-error';
 
+export class BadRequestError extends AppError {
+  constructor(message?: string) {
+    super(message ?? 'Invalid input', 400);
+  }
+}
+
 export class UnauthorizedError extends AppError {
   constructor() {
     super('Unauthorized', 401);
@@ -21,11 +27,5 @@ export class NotFoundError extends AppError {
 export class ConflictError extends AppError {
   constructor(resource = 'Resource') {
     super(`${resource} already exists`, 409);
-  }
-}
-
-export class BadRequestError extends AppError {
-  constructor(message?: string) {
-    super(message ?? 'Invalid input', 400);
   }
 }

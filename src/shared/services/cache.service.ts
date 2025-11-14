@@ -10,17 +10,23 @@ const redLockOptions = {
 };
 
 /**
- * A lightweight Redis-based cache and distributed lock service.
+ * Redis-based cache and distributed lock service.
  *
- * Provides helpers for basic Redis operations (GET, SET, LIST ops, TTL, etc.)
- * and distributed locking via Redlock. Designed to be used as a singleton.
+ * Provides:
+ * - Basic Redis operations (GET, SET, DEL, TTL, list operations)
+ * - Distributed locks via Redlock
+ *
+ * Notes:
+ * - Designed as a singleton.
+ * - Some operations may throw if Redis or Redlock are not connected.
  */
 class CacheService {
   private client?: Redis;
   private redlock?: Redlock;
 
   /**
-   * Establishes a Redis connection and initializes Redlock.
+   * Connect to Redis and initialize Redlock.
+   * Subsequent calls will reuse the same connection.
    */
   connect(options: { host: string; port: number; pw?: string }): void {
     logger.info(`[Redis] Connecting to ${options.host}:${options.port} ...`);
@@ -29,49 +35,34 @@ class CacheService {
       port: options.port,
       password: options.pw,
     });
-    // Initialize Redlock after Redis client is ready
+
     this.redlock = new Redlock([this.client], redLockOptions);
 
-    this.client.on('connect', () => {
-      logger.info('[Redis] Connected');
-    });
+    this.client.on('connect', () => logger.info('[Redis] Connected'));
+    this.client.on('ready', () => logger.debug('[Redis] Ready for commands'));
+    this.client.on('reconnecting', (time: any) =>
+      logger.debug(`[Redis] Reconnecting in ${time} ms`)
+    );
+    this.client.on('error', (err) =>
+      logger.error('[Redis] Connection failed:', err)
+    );
 
-    this.client.on('ready', () => {
-      logger.debug('[Redis] Ready for commands');
-    });
-
-    this.client.on('reconnecting', (time: any) => {
-      logger.debug(`[Redis] Reconnecting in ${time} ms`);
-    });
-
-    this.client.on('error', (err) => {
-      logger.error('[Redis] Connection failed:', err);
-    });
-
-    this.redlock.on('clientError', (err) => {
-      logger.error('Redlock client error', err);
-    });
+    this.redlock.on('clientError', (err) =>
+      logger.error('Redlock client error', err)
+    );
   }
 
   /**
-   * Returns the underlying Redis instance.
-   * Throws if Redis is not yet connected.
+   * Returns the Redis client.
+   * @throws If Redis is not connected.
    */
   get instance(): Redis {
-    return this.getClient();
-  }
-
-  /**
-   * Ensures Redis client is connected before use.
-   * @throws If Redis client is not connected.
-   */
-  private getClient(): Redis {
     if (!this.client) throw new Error('Redis client not connected');
     return this.client;
   }
 
   /**
-   * Ensures Redlock is initialized before use.
+   * Returns the Redlock instance.
    * @throws If Redlock is not initialized.
    */
   private getRedlock(): Redlock {
@@ -80,13 +71,8 @@ class CacheService {
   }
 
   /**
-   * Executes a function under a distributed lock using Redlock.
-   *
-   * @template T
-   * @param {string} key - Lock key.
-   * @param {number} ttl - Lock TTL (milliseconds).
-   * @param {() => Promise<T>} fn - Function to run while holding the lock.
-   * @returns {Promise<T>} The return value of `fn`.
+   * Acquire a distributed lock and run a function under it.
+   * If TTL expires, releasing the lock may fail.
    */
   async lock<T>(key: string, ttl: number, fn: () => Promise<T>): Promise<T> {
     const lock = await this.getRedlock().acquire([key], ttl);
@@ -95,7 +81,7 @@ class CacheService {
     } finally {
       await lock.release().catch((err) => {
         logger.error(
-          `[Redis] Failed to release lock (maybe TTL expired) ${key}`,
+          `[Redis] Failed to release lock (TTL may have expired) ${key}`,
           err
         );
       });
@@ -103,26 +89,16 @@ class CacheService {
   }
 
   /**
-   * Stores a value in Redis with optional TTL.
-   *
-   * @template T
-   * @param {string} key - Redis key.
-   * @param {T} value - Value to store (auto-serialized).
-   * @param {number | 'KEEPTTL'} [ttlSeconds] - TTL in seconds or `'KEEPTTL'` to preserve existing TTL.
+   * Set a key with optional TTL.
+   * TTL can be a number (seconds) or 'KEEPTTL' to preserve existing TTL.
    */
   async set<T>(
     key: string,
     value: T,
     ttlSeconds?: number | 'KEEPTTL'
   ): Promise<void> {
-    const redis = this.getClient();
+    const redis = this.instance;
     const data = JSON.stringify(value);
-
-    logger.debug(
-      `[Redis] SET ${key} (ttl: ${ttlSeconds ?? '∞'}) value: ${data.slice(0, 100)}${
-        data.length > 100 ? '...' : ''
-      }`
-    );
 
     if (ttlSeconds === 'KEEPTTL') {
       await redis.set(key, data, 'KEEPTTL');
@@ -134,54 +110,13 @@ class CacheService {
   }
 
   /**
-   * Get remaining TTL for a Redis key.
-   *
-   * @param {string} key - Redis key.
-   * @returns {Promise<number>} TTL in seconds, -1 if persistent, -2 if missing.
-   */
-  async ttl(key: string): Promise<number> {
-    const redis = this.getClient();
-    logger.debug(`[Redis] TTL ${key}`);
-
-    const ttl = await redis.ttl(key);
-
-    logger.debug(`[Redis] TTL ${key} value: ${ttl}`);
-
-    return ttl;
-  }
-
-  /**
-   * Checks if a key exists and has a positive TTL.
-   *
-   * @param {string} key - Redis key to check.
-   * @returns {Promise<boolean>} True if key has a TTL > 0.
-   */
-  async hasTTL(key: string): Promise<boolean> {
-    const ttl = await this.ttl(key);
-    return ttl > 0;
-  }
-
-  /**
-   * Retrieves and parses a JSON value from Redis.
-   *
-   * @template T
-   * @param {string} key - Redis key.
-   * @returns {Promise<T|null>} Parsed value or null if missing/invalid.
+   * Get a parsed JSON value from Redis.
+   * Returns null if key is missing or parsing fails.
    */
   async get<T>(key: string): Promise<T | null> {
-    const redis = this.getClient();
-    logger.debug(`[Redis] GET ${key}`);
-
+    const redis = this.instance;
     const raw = await redis.get(key);
-    if (!raw) {
-      logger.debug(`[Redis] MISS ${key}`);
-      return null;
-    }
-
-    logger.debug(
-      `[Redis] HIT ${key} value: ${raw.slice(0, 100)}${raw.length > 100 ? '...' : ''}`
-    );
-
+    if (!raw) return null;
     try {
       return JSON.parse(raw) as T;
     } catch (err) {
@@ -191,125 +126,91 @@ class CacheService {
   }
 
   /**
-   * Deletes a Redis key.
-   *
-   * @param {string} key - Redis key to delete.
-   * @returns {Promise<number>} Number of keys deleted (0 or 1).
+   * Delete a key.
+   * @returns Number of keys deleted (0 or 1)
    */
   async del(key: string): Promise<number> {
-    const redis = this.getClient();
-    logger.debug(`[Redis] DEL ${key}`);
-    return await redis.del(key);
+    return await this.instance.del(key);
   }
 
   /**
-   * Clears all Redis keys (use carefully).
+   * Clears all keys. Use with caution.
    */
   async flushAll(): Promise<void> {
-    const redis = this.getClient();
-    logger.debug('[Redis] FLUSHALL (clearing all keys!)');
-    await redis.flushall();
+    await this.instance.flushall();
   }
 
   /**
-   * Pushes one or more elements to a Redis list (LPUSH).
-   *
-   * @template T
-   * @param {string} key - Redis list key.
-   * @param {T[]|T} values - Values to push.
-   * @param {number} [ttlSeconds] - Optional TTL for the list.
-   * @returns {Promise<number>} New list length.
+   * Push one or more elements to a Redis list.
+   * Optional TTL for the list.
    */
   async lpush<T>(
     key: string,
     values: T[] | T,
     ttlSeconds?: number
   ): Promise<number> {
-    const redis = this.getClient();
-
+    const redis = this.instance;
     const list = Array.isArray(values) ? values : [values];
     const data = list.map((v) => JSON.stringify(v));
-
-    logger.debug(
-      `[Redis] LPUSH ${key} count=${data.length} (ttl: ${ttlSeconds ?? '∞'})`
-    );
-
     const result = await redis.lpush(key, ...data);
-
-    if (ttlSeconds) {
-      await redis.expire(key, ttlSeconds);
-    }
-
+    if (ttlSeconds) await redis.expire(key, ttlSeconds);
     return result;
   }
 
   /**
-   * Returns a list of parsed elements within a range.
-   *
-   * @template T
-   * @param {string} key - Redis list key.
-   * @param {number} [start=0] - Start index.
-   * @param {number} [stop=-1] - End index (inclusive).
-   * @returns {Promise<T[]>} List of parsed items.
+   * Get a range of parsed items from a Redis list.
    */
   async lrange<T>(key: string, start = 0, stop = -1): Promise<T[]> {
-    const redis = this.getClient();
+    const redis = this.instance;
     const rawList = await redis.lrange(key, start, stop);
-    const data = rawList.map((x) => JSON.parse(x) as T);
-
-    logger.debug(`[Redis] LRANGE ${key} data.length: ${data.length}`);
-
-    return data;
+    return rawList.map((x) => JSON.parse(x) as T);
   }
 
   /**
-   * Trims a list to a specific range.
-   *
-   * @param {string} key - Redis list key.
-   * @param {number} start - Start index.
-   * @param {number} stop - End index.
+   * Trim a list to a given range.
    */
   async ltrim(key: string, start: number, stop: number): Promise<void> {
-    const redis = this.getClient();
-    logger.debug(`[Redis] LTRIM ${key} ${start} ${stop}`);
-    await redis.ltrim(key, start, stop);
+    await this.instance.ltrim(key, start, stop);
   }
 
   /**
-   * Overwrites an element in a list at a given index (LSET).
+   * Overwrite an element in a list at a given index.
    */
   async lset<T>(key: string, index: number, value: T): Promise<'OK'> {
-    const redis = this.getClient();
-    const data = JSON.stringify(value);
-    logger.debug(`[Redis] LSET ${key} index=${index}`);
-    return await redis.lset(key, index, data);
+    return await this.instance.lset(key, index, JSON.stringify(value));
   }
 
   /**
-   * Removes occurrences of a value from a Redis list.
+   * Remove occurrences of a value from a list.
    */
   async lrem<T>(key: string, count: number, value: T): Promise<number> {
-    const redis = this.getClient();
-    logger.debug(`[Redis] LREM ${key} count=${count}`);
-    return await redis.lrem(key, count, JSON.stringify(value));
+    return await this.instance.lrem(key, count, JSON.stringify(value));
+  }
+
+  /**
+   * Get TTL in seconds.
+   * Returns -1 for persistent keys, -2 if key does not exist.
+   */
+  async ttl(key: string): Promise<number> {
+    return await this.instance.ttl(key);
+  }
+
+  /**
+   * Returns true if key exists and TTL > 0
+   */
+  async hasTTL(key: string): Promise<boolean> {
+    const ttl = await this.ttl(key);
+    return ttl > 0;
   }
 }
 
 let instance: CacheService | null = null;
 
-/**
- * Returns a singleton instance of CacheService.
- */
 export function getCacheService() {
-  if (!instance) {
-    instance = new CacheService();
-  }
+  if (!instance) instance = new CacheService();
   return instance;
 }
 
-/**
- * Resets the CacheService singleton instance (for tests or reinit).
- */
 export function resetCacheService() {
   instance = null;
 }

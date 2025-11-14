@@ -5,8 +5,8 @@ import { formatZodError } from '@shared/utils/error-formatter';
 import { resUtil } from '@shared/utils/response.util';
 
 export const validate = (
-  schema: z.ZodType,
-  location: 'body' | 'params' | 'query'
+  location: 'body' | 'params' | 'query',
+  schema: z.ZodType
 ): RequestHandler => {
   return (req, res, next) => {
     const result = schema.safeParse(req[location]);

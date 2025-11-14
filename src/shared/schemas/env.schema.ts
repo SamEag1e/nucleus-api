@@ -1,5 +1,6 @@
-import { LogLevelEnum, zodLogLevelEnum } from '@shared/enums/loglevel.enum';
 import { z } from 'zod';
+
+import { LogLevelEnum, zodLogLevelEnum } from '@shared/enums/loglevel.enum';
 
 export const envSchema = z.object({
   APP_PORT: z.coerce.number().default(3000),
