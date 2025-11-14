@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ResponseStatusEnum } from '@shared/enums/response-status.enum';
+
 export const successResponse = (description: string, dataSchema: any) => {
   // If it’s already a Zod object, use it; otherwise, wrap as z.object
   const schema =
@@ -10,7 +12,7 @@ export const successResponse = (description: string, dataSchema: any) => {
     content: {
       'application/json': {
         schema: z.object({
-          status: z.literal('success'),
+          status: z.literal(ResponseStatusEnum.Success),
           data: schema,
         }),
       },
@@ -25,7 +27,7 @@ export const failResponse = (
   content: {
     'application/json': {
       schema: z.object({
-        status: z.literal('fail'),
+        status: z.literal(ResponseStatusEnum.Fail),
         data: z.object(),
       }),
     },
@@ -37,7 +39,7 @@ export const errorResponse = (description = 'Unexpected server error') => ({
   content: {
     'application/json': {
       schema: z.object({
-        status: z.literal('error'),
+        status: z.literal(ResponseStatusEnum.Error),
         message: z.string(),
         data: z.object().optional(),
       }),
