@@ -95,13 +95,14 @@ import { JsonSchema } from '@shared/schemas/json-schema.type';
 
 export const userJsonSchema: JsonSchema = {
   bsonType: 'object',
-  required: ['email', 'password'],
+  required: ['username', 'password'],
   properties: {
+    username: { bsonType: 'string' },
+    password: { bsonType: 'string' },
+
     firstName: { bsonType: 'string' },
     lastName: { bsonType: 'string' },
     gender: { bsonType: 'string' },
-    email: { bsonType: 'string' },
-    password: { bsonType: 'string' },
   },
 };
 ```
@@ -137,11 +138,12 @@ import { GenderEnum } from '@shared/enums/gender.enum';
 
 const userMongoSchema = new mongoose.Schema(
   {
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+
     firstName: { type: String },
     lastName: { type: String },
     gender: { type: String, enum: Object.values(GenderEnum) },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
   },
   {
     timestamps: true,
