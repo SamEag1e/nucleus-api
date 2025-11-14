@@ -44,7 +44,7 @@ export const createApp = (options: { isDev: boolean }) => {
   }
 
   // API routes
-  app.use('/api/v2', router);
+  app.use('/api/v1', router);
 
   // Global error handler
   app.use(errorHandler);
