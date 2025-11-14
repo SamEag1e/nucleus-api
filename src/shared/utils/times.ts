@@ -1,4 +1,6 @@
 export const times = {
+  requestsTimeout: 1000 * 60 * 2, // 120_000 ms
+
   sleep(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
   },
