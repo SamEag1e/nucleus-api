@@ -1,12 +1,10 @@
+import bcrypt from 'bcrypt';
+
 import { userModel } from './models/user.model';
 import { ExposeUser, userZodSchema } from './schemas/user.schema';
 import { UpdateUser } from './schemas/update-user.schema';
 import { CreateUser } from './schemas/create-user.schema';
-import {
-  BadRequestError,
-  ConflictError,
-  NotFoundError,
-} from '@shared/exceptions/4xx';
+import { ConflictError, NotFoundError } from '@shared/exceptions/4xx';
 import logger from '@shared/logger/logger';
 
 class UsersService {
@@ -16,7 +14,7 @@ class UsersService {
           $or: [
             { firstName: { $regex: q, $options: 'i' } },
             { lastName: { $regex: q, $options: 'i' } },
-            { userName: { $regex: q, $options: 'i' } },
+            { username: { $regex: q, $options: 'i' } },
           ],
         }
       : {};
@@ -58,13 +56,29 @@ class UsersService {
   }
 
   async create(data: CreateUser): Promise<ExposeUser> {
-    throw new BadRequestError();
-    // TODO:
+    const existing = await this.findOneByUsername(data.username);
+    if (existing) throw new ConflictError('User');
+
+    const hashedPw = await bcrypt.hash(data.password, 12);
+    const createdDoc = await userModel.create({
+      username: data.username,
+      password: hashedPw,
+    });
+    const createdUser = await this.findOne(createdDoc._id.toString());
+
+    return createdUser;
   }
 
   async update(id: string, data: UpdateUser): Promise<ExposeUser> {
-    throw new BadRequestError();
-    // TODO:
+    const updated = await userModel.findByIdAndUpdate(id, data, {
+      new: true,
+      runValidators: true,
+      lean: true,
+    });
+
+    if (!updated) throw new NotFoundError('User');
+
+    return updated;
   }
 }
 
