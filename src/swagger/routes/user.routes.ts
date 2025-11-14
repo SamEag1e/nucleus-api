@@ -45,7 +45,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: '/users/usernameExists/{username}',
+  path: '/users/exists/{username}',
   request: { params: usernameParamZodSchema },
   responses: {
     200: successResponse('Check if a username exists in db.', {

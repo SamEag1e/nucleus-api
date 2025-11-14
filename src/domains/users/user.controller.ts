@@ -22,7 +22,7 @@ class UserController {
     return resUtil.success(res, { user });
   }
 
-  async usernameExists(req: TypedRequest<UsernameParam>, res: Response) {
+  async exists(req: TypedRequest<UsernameParam>, res: Response) {
     const existing = await usersService.findOneByUsername(req.params.username);
 
     return resUtil.success(res, { exists: existing ? true : false });

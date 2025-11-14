@@ -24,9 +24,9 @@ router.get(
 );
 
 router.get(
-  '/usernameExists/:username',
+  '/exists/:username',
   validate('params', usernameParamZodSchema),
-  asyncHandler(userController.usernameExists)
+  asyncHandler(userController.exists)
 );
 
 router.post(
