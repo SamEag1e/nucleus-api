@@ -24,7 +24,7 @@ router.get(
 );
 
 router.get(
-  '/:id',
+  '/usernameExists/:username',
   validate('params', usernameParamZodSchema),
   asyncHandler(userController.usernameExists)
 );
