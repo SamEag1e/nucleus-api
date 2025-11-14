@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { times } from '@shared/utils/times';
 import logger from '@shared/logger/logger';
 
-class RequestsService {
+class RequestService {
   private readonly timeout = times.requestsTimeout;
 
   async get<T = any>(
@@ -97,11 +97,11 @@ class RequestsService {
   }
 }
 
-let instance: RequestsService | null = null;
+let instance: RequestService | null = null;
 
 export function getRequestsService() {
   if (!instance) {
-    instance = new RequestsService();
+    instance = new RequestService();
   }
   return instance;
 }
